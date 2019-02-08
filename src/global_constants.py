@@ -1,113 +1,7 @@
-# shared lists of allowed classes, shared across multiple vehicle types
-# these lists are similar but not identical across Iron Horse, Squid, Road Hog etc
-base_refits_by_class = {'empty': [],
-                        'all_freight': ['CC_MAIL', 'CC_BULK', 'CC_PIECE_GOODS', 'CC_EXPRESS', 'CC_LIQUID', 'CC_ARMOURED', 'CC_REFRIGERATED', 'CC_COVERED', 'CC_NON_POURABLE'],
-                        'pax': ['CC_PASSENGERS'],
-                        'mail': ['CC_MAIL'],
-                        'liquids': ['CC_LIQUID'],
-                        'packaged_freight': ['CC_PIECE_GOODS', 'CC_EXPRESS', 'CC_ARMOURED', 'CC_LIQUID'],
-                        'flatbed_freight': ['CC_PIECE_GOODS'],
-                        'dump_freight': ['CC_BULK'],
-                        'covered_hopper_freight': [], # explicit allowal by label instead
-                        'refrigerated_freight': ['CC_REFRIGERATED'],
-                        'express_freight': ['CC_EXPRESS','CC_ARMOURED']}
-
-# rather than using disallowed classes (can cause breakage), specific labels are disallowed
-# this is done per vehicle type, or added to global_constants for ease of reuse and updating
-# these lists are similar but not identical across Iron Horse, Squid, Road Hog etc
-disallowed_refits_by_label = {'non_dump_bulk': ['WOOD', 'SGCN', 'FICR', 'BDMT', 'WDPR', 'GRAI', 'WHEA', 'CERE', 'MAIZ', 'FRUT', 'BEAN', 'CMNT', 'CTCD', 'FERT', 'OLSD', 'SUGR', 'SULP', 'TOFF', 'URAN'],
-                              'edible_liquids': ['MILK', 'WATR', 'BEER', 'FOOD', 'EOIL'],
-                              'non_flatbed_freight': ['FOOD', 'FISH', 'LVST', 'FRUT', 'BEER', 'MILK', 'JAVA', 'SUGR', 'NUTS', 'EOIL', 'BOOM', 'FERT'],
-                              'non_edible_liquids': ['RFPR', 'OIL_', 'FMSP', 'PETR', 'RUBR', 'SULP'],
-                              'non_freight_special_cases': ['TOUR']}
-
 # capacity multipliers for capacity parameter
 capacity_multipliers = (0.67, 1, 1.33)
-# mailbags are < 1t, multiply capacity appropriately
-mail_multiplier = 2
-
-# used to construct the cargo table automatically
-# ! order is significant ! - openttd will cascade through default cargos in the order specified by the cargo table
-cargo_labels = ('PASS', # pax first
-                'TOUR',
-                # "the mail must get through"
-                'MAIL',
-                # all other cargos - append new ones to end, don't change order
-                'COAL',
-                'IORE',
-                'GRVL',
-                'SAND',
-                'AORE',
-                'CORE',
-                'CLAY',
-                'SCMT',
-                'WOOD',
-                'LIME',
-                'GOOD',
-                'FOOD',
-                'STEL',
-                'FMSP',
-                'ENSP',
-                'BEER',
-                'BDMT',
-                'MNSP',
-                'PAPR',
-                'WDPR',
-                'VEHI',
-                'COPR',
-                'DYES',
-                'OIL_',
-                'RFPR',
-                'PETR',
-                'PLAS',
-                'WATR',
-                'FISH',
-                'CERE',
-                'FICR',
-                'FRVG',
-                'FRUT',
-                'GRAI',
-                'LVST',
-                'MAIZ',
-                'MILK',
-                'RUBR',
-                'SGBT',
-                'SGCN',
-                'WHEA',
-                'WOOL',
-                'OLSD',
-                'SUGR',
-                'BEAN',
-                'NITR',
-                'JAVA',
-                'VEHI',
-                'EOIL',
-                'CASS',
-                'NUTS',
-                'MNO2',
-                'PHOS',
-                'PORE',
-                'POTA',
-                'FERT',
-                'CMNT',
-                'CTCD',
-                'TOFF',
-                'SULP',
-                'URAN',
-                'QLME',
-                'SASH',
-                'BOOM')
 
 grfid = r"\97\87\EA\FE"
-
-# chameleon templating goes faster if a cache dir is used; this specifies which dir is cache dir
-chameleon_cache_dir = '.chameleon_cache'
-
-# specify location for intermediate files generated during build (nml, graphics, lang etc)
-generated_files_dir = 'generated'
-
-# this is for nml, don't need to use python path module here
-graphics_path = generated_files_dir + '/graphics/'
 
 # cargo aging constant - OTTD default is 185
 CARGO_AGE_PERIOD = 185
@@ -115,9 +9,6 @@ CARGO_AGE_PERIOD = 185
 # cost constants
 FIXED_RUN_COST = 500.0
 FUEL_RUN_COST = 10.0
-
-# OpenTTD's max date
-max_game_date = 5000001
 
 # standard offsets for vehicle
 # 3/8, 4/8, 5/8, 6/8, 7/8 and 8/8 were adjusted June 2016, tested, all looked correct
@@ -140,3 +31,16 @@ spritesheet_bounding_boxes = ((60, 12, 24), (92, 26, 20), (124, 36, 16), (172, 2
 buy_menu_sprite_width = 36 # 36 is correct, but some spritesheets might have wrong widths due to copy-pasteo etc
 buy_menu_sprite_height = 16
 
+# shared global constants via Polar Fox library - import at end to make the this project's constants easier to work with
+# done this way so we don't have to pass Polar Fox to templates, we can just pass global_constants
+# assignments are clunky - they exist to stop pyflakes tripping on 'unused' imports
+import polar_fox.constants
+base_refits_by_class = polar_fox.constants.base_refits_by_class
+cargo_labels = polar_fox.constants.cargo_labels
+chameleon_cache_dir = polar_fox.constants.chameleon_cache_dir
+default_cargos = polar_fox.constants.default_cargos
+disallowed_refits_by_label = polar_fox.constants.disallowed_refits_by_label
+generated_files_dir = polar_fox.constants.generated_files_dir
+graphics_path = polar_fox.constants.graphics_path
+mail_multiplier = polar_fox.constants.mail_multiplier
+max_game_date = polar_fox.constants.max_game_date

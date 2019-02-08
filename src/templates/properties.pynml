@@ -1,23 +1,25 @@
 // -- some switches are common to all vehicles so included with properties -- //
 
 // -- smoke -- //
-switch (FEAT_ROADVEHS, SELF, ${vehicle.id}_create_visual_effect, ${vehicle.get_expression_for_effects()}) {
-    return ${len(vehicle.effects)};
+switch (FEAT_ROADVEHS, SELF, ${vehicle.id}_create_visual_effect, ${vehicle.get_effects()[0]}) {
+    return ${vehicle.get_effects()[1]};
 }
 
 
 // -- props -- //
 item(FEAT_ROADVEHS, ${vehicle.id}, ${vehicle.numeric_id}) {
     property {
-        name:                           ${consist.get_name()};
+        name:                           ${consist.name};
         cargo_capacity:                 ${vehicle.capacities[0]};
         sprite_id:                      SPRITE_ID_NEW_ROADVEH; //enable new graphics - nml constant
+        <!--! if NRT gets done
         <tal:tram_type condition="consist.tram_type is not None">
             tram_type:                      ${consist.tram_type};
         </tal:tram_type>
         <tal:road_type condition="consist.road_type is not None">
             road_type:                      ${consist.road_type};
         </tal:road_type>
+        -->
         <tal:lead_unit_props condition="vehicle.is_lead_unit_of_consist">
             introduction_date:              date(${consist.intro_date},01,01); // consist just supplies intro year - openttd randomises intro dates a bit anyway
             power:                          ${consist.power}hp;
@@ -27,7 +29,7 @@ item(FEAT_ROADVEHS, ${vehicle.id}, ${vehicle.numeric_id}) {
             cost_factor:                    ${consist.buy_cost};
             running_cost_base:              RUNNING_COST_ROADVEH;
             running_cost_factor:            ${consist.running_cost};
-            model_life:                     ${consist.adjusted_model_life};
+            model_life:                     ${consist.model_life};
             vehicle_life:                   ${consist.vehicle_life};
             reliability_decay:              20; // default value
             retire_early:                   ${consist.retire_early};
@@ -38,7 +40,9 @@ item(FEAT_ROADVEHS, ${vehicle.id}, ${vehicle.numeric_id}) {
         non_refittable_cargo_classes:   bitmask(); // don't set non-refittable classes, increases likelihood of breaking cargo support
         cargo_allow_refit:              [${consist.get_label_refits_allowed()}];
         cargo_disallow_refit:           [${consist.get_label_refits_disallowed()}];
-        default_cargo_type:             ${consist.default_cargo};
+        <tal:default_cargo condition="len(consist.default_cargos) > 0">
+            default_cargo_type:             ${consist.get_nml_expression_for_default_cargos()};
+        </tal:default_cargo>
         cargo_age_period:               ${consist.cargo_age_period};
         misc_flags:                     bitmask(${vehicle.special_flags}); // nml constants
         length:                         ${vehicle.vehicle_length};
@@ -52,7 +56,7 @@ item(FEAT_ROADVEHS, ${vehicle.id}, ${vehicle.numeric_id}) {
         purchase:                       ${vehicle.id}_sg_purchase;
         create_effect:                  ${vehicle.id}_create_visual_effect;
         <!--! no buy menu extra text in this grf by design; extra text is associated with BAD FEATURES -->
-        <tal:add_articulated_parts condition="vehicle.is_lead_unit_of_consist">
+        <tal:add_articulated_parts condition="vehicle.is_lead_unit_of_consist and len(consist.units) > 1">
             articulated_part: ${consist.id}_articulated_cb_switch;
         </tal:add_articulated_parts>
     }
@@ -65,6 +69,3 @@ if (${consist.get_expression_for_roster()}) {
         }
     }
 }
-
-// -- end ${vehicle.numeric_id} -- <!--! another comment to aid reading the final nml  -->
-

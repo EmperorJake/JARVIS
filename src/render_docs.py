@@ -1,11 +1,3 @@
-#!/usr/bin/env python
-
-"""
-  This file is part of Road Hog Newgrf for OpenTTD.
-  Road Hog is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
-  Road Hog is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-  See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with Road Hog. If not, see <http://www.gnu.org/licenses/>.
-"""
 print("[RENDER DOCS] render_docs.py")
 
 import codecs # used for writing files - more unicode friendly than standard open() module
@@ -14,6 +6,7 @@ import shutil
 import sys
 import os
 currentdir = os.curdir
+from time import time
 
 from PIL import Image
 
@@ -86,7 +79,7 @@ class DocHelper(object):
         props_to_print = {}
         for vehicle in self.get_vehicles_by_subclass()[subclass]:
             result = {'vehicle':{}, 'subclass_props': []}
-            result = self.fetch_prop(result, 'Vehicle Name', vehicle.get_name_substr() + base_lang_strings[vehicle.get_str_name_suffix()])
+            result = self.fetch_prop(result, 'Vehicle Name', self.unpack_name_string(vehicle))
             result = self.fetch_prop(result, 'HP', int(vehicle.power))
             result = self.fetch_prop(result, 'Speed (mph)', vehicle.speed)
             result = self.fetch_prop(result, 'Weight (t)', int(vehicle.weight)) # cast to int to get same result as game will show
@@ -96,12 +89,17 @@ class DocHelper(object):
             result = self.fetch_prop(result, 'Buy Cost Factor', round(vehicle.buy_cost, 2))
             result = self.fetch_prop(result, 'Running Cost Factor', round(vehicle.running_cost, 2))
             #result = self.fetch_prop(result, 'Loading Speed', vehicle.loading_speed)
-            #result = self.fetch_prop(result, 'Model Variants', len(vehicle.model_variants))
-
             props_to_print[vehicle] = result['vehicle']
             props_to_print[subclass] = result['subclass_props']
 
         return props_to_print
+
+    def unpack_name_string(self, consist):
+        substrings = consist.name.split('string(')
+        name = consist._name
+        type_suffix = base_lang_strings[substrings[3][0:-3]]
+        power_suffix = base_lang_strings[substrings[4][0:-2]]
+        return name + ' ' + type_suffix + ' (' + power_suffix + ')'
 
     def get_base_numeric_id(self, consist):
         return consist.base_numeric_id
@@ -145,7 +143,7 @@ def render_docs_images():
     # for development, just run render_graphics manually before running render_docs
     vehicle_graphics_src = os.path.join(currentdir, 'generated', 'graphics')
     for consist in consists:
-        vehicle_spritesheet = Image.open(os.path.join(vehicle_graphics_src, consist.id + '_0.png'))
+        vehicle_spritesheet = Image.open(os.path.join(vehicle_graphics_src, consist.id + '.png'))
         processed_vehicle_image = vehicle_spritesheet.crop(box=(370,
                                                                 10,
                                                                 370 + global_constants.buy_menu_sprite_width,
@@ -157,6 +155,7 @@ def render_docs_images():
         processed_vehicle_image.save(output_path, optimize=True, transparency=0)
 
 def main():
+    start = time()
     # render standard docs from a list
     html_docs = ['road_vehicles', 'code_reference', 'get_started']
     txt_docs = ['license', 'readme']
@@ -169,7 +168,8 @@ def main():
     render_docs(markdown_docs, 'html', use_markdown=True)
     # process images for use in docs
     render_docs_images()
-
+    # eh, how long does this take anyway?
+    print(format((time() - start), '.2f')+'s')
 
 if __name__ == '__main__':
     main()

@@ -11,11 +11,12 @@ from chameleon import PageTemplateLoader # chameleon used in most template cases
 # setup the places we look for templates
 templates = PageTemplateLoader(os.path.join(currentdir, 'src', 'templates'))
 
+import polar_fox
 import global_constants # expose all constants for easy passing to templates
 import utils
 
-from graphics_processor.visible_cargo import VisibleCargo, VisibleCargoCustom, VisibleCargoLiveryOnly
-import graphics_processor.utils as graphics_utils
+from gestalt_graphics.gestalt_graphics import GestaltGraphics, GestaltGraphicsVisibleCargo, GestaltGraphicsLiveryOnly, GestaltGraphicsCustom
+import gestalt_graphics.graphics_constants as graphics_constants
 
 from rosters import registered_rosters
 from vehicles import numeric_id_defender
@@ -29,7 +30,7 @@ class Consist(object):
         self.id = kwargs.get('id', None)
         self.vehicle_module_path = inspect.stack()[2][1]
         # setup properties for this consist (props either shared for all vehicles, or placed on lead vehicle of consist)
-        self.title = kwargs.get('title', None)
+        self._name = kwargs.get('name', None) # private as 'name' is an @property method to add type substring
         self.base_numeric_id = kwargs.get('base_numeric_id', None)
         self.road_type = kwargs.get('road_type', None)
         self.tram_type = kwargs.get('tram_type', None)
@@ -39,11 +40,16 @@ class Consist(object):
         self.intro_date = kwargs.get('intro_date', None)
         self.vehicle_life = kwargs.get('vehicle_life', None)
         self._power = kwargs.get('power', None)
-        self._sound_effect = kwargs.get('sound_effect', None)
+        # sound effects are faff, they can be set by consist subclass (Bus vs. Coach), or will fall back to a default sound for the vehicle subclass (by power type)
+        self._sound_effect = None
+        self.default_sound_effect = None # set by unit subclasses
+        # suffix for 'Diesel', 'Steam' etc in name string, set by unit subclasses, but stored in consist as it's a consist property
+        self._power_type_suffix = None
+        # option for multiple default cargos, cascading if first cargo(s) are not available
+        self.default_cargos = []
         # semi-trucks need some redistribution of capacity to get correct TE (don't use this of other magic, bad idea)
         self.semi_truck_so_redistribute_capacity = kwargs.get('semi_truck_so_redistribute_capacity', False)
         self._speed = kwargs.get('speed', None)
-        self.default_cargo = 'PASS' # over-ride in subclass as needed (PASS is sane default)
         self.class_refit_groups = []
         self.label_refits_allowed = [] # no specific labels needed
         self.label_refits_disallowed = []
@@ -57,23 +63,21 @@ class Consist(object):
         # multiplier of capacity, used to set consist weight, over-ride in vehicle sub-class as needed
         # set this to the value for road vehicles...trams will be automatically adjusted
         self.weight_multiplier = 0.4
-        # create a structure to hold model variants
-        self.model_variants = []
         # create structure to hold the units
         self.units = []
-        # cargo /livery graphics options
-        self.visible_cargo = VisibleCargo()
+        # create a structure for cargo /livery graphics options
+        self.gestalt_graphics = GestaltGraphics()
         # roster is set when the vehicle is registered to a roster, only one roster per vehicle
         self.roster_id = None
-
-    def add_model_variant(self, intro_date, end_date, spritesheet_suffix, graphics_processor=None):
-        self.model_variants.append(ModelVariant(intro_date, end_date, spritesheet_suffix, graphics_processor))
 
     def add_unit(self, repeat=1, **kwargs):
         # how many unique units? (units can be repeated, we are using count for numerid ID, so we want uniques)
         count = len(set(self.units))
 
-        unit = RoadVehicle(consist=self, **kwargs)
+        if kwargs.get('type', None) is not None:
+            unit = kwargs['type'](consist=self, **kwargs)
+        else:
+            unit = RoadVehicle(consist=self, **kwargs)
 
         if count == 0:
             unit.id = self.id # first vehicle gets no numeric id suffix - for compatibility with buy menu list ids etc
@@ -121,52 +125,25 @@ class Consist(object):
         numeric_id_defender.append(numeric_id)
         return numeric_id
 
-    def get_reduced_set_of_variant_dates(self):
-        # find all the unique dates that will need a switch constructing
-        years = set()
-        for variant in self.model_variants:
-            years.update((variant.intro_date, variant.end_date))
-        years = sorted(years)
-        # quick integrity check
-        if years[0] != 0:
-            utils.echo_message(self.id + " doesn't have at least one model variant with intro date 0 (required for nml switches to work)")
-        return years
+    @property
+    def name_type_suffix(self):
+        # some consist subclasses will over-ride this for special case handling
+        result = 'STR_NAME_SUFFIX_' + self._name_type_suffix
+        if self.roadveh_flag_tram:
+            return result + "_TRAM"
+        else:
+            return result + "_TRUCK"
 
-    def get_num_spritesets(self):
-        return len(set([i.spritesheet_suffix for i in self.model_variants]))
+    @property
+    def power_type_suffix(self):
+        if self._power_type_suffix is None:
+            utils.echo_message('Consist ' + self.id + ' has no _power_type_suffix set by any of its units')
+        else:
+            return 'STR_NAME_SUFFIX_' + self._power_type_suffix
 
-    def get_variants_available_for_specific_year(self, year):
-        # put the data in a format that's easy to render as switches
-        result = []
-        for variant in self.model_variants:
-            if variant.intro_date <= year < variant.end_date:
-                result.append(variant.spritesheet_suffix)
-        return result # could call set() here, but I didn't bother, shouldn't be needed if model variants set up correctly
-
-    def get_nml_random_switch_fragments_for_model_variants(self, vehicle):
-        # return fragments of nml for use in switches
-        result = []
-        years = self.get_reduced_set_of_variant_dates()
-        for index, year in enumerate(years):
-            if index < len(years) - 1:
-                from_date = year
-                until_date = years[index + 1] - 1
-                result.append(str(from_date) + '..' + str(until_date) + ':' + vehicle.id + '_switch_graphics_random_' + str(from_date))
-        return result
-
-    def get_name_substr(self):
-        # relies on name being in format "Foo [Bar]" for Name [Type Suffix]
-        return self.title.split('[')[0]
-
-    def get_str_name_suffix(self):
-        # used in vehicle name string only, relies on name property value being in format "Foo [Bar]" for Name [Type Suffix]
-        type_suffix = self.title.split('[')[1].split(']')[0]
-        type_suffix = type_suffix.upper()
-        type_suffix = '_'.join(type_suffix.split(' '))
-        return 'STR_NAME_SUFFIX_' + type_suffix
-
-    def get_name(self):
-        return "string(STR_NAME_" + self.id +", string(" + self.get_str_name_suffix() + "))"
+    @property
+    def name(self):
+        return "string(STR_NAME_CONSIST, string(STR_NAME_" + self.id + "), string(" + self.name_type_suffix + "), string(" + self.power_type_suffix +"))"
 
     def get_spriterows_for_consist_or_subpart(self, units):
         # pass either list of all units in consist, or a slice of the consist starting from front (arbitrary slices not useful)
@@ -178,15 +155,9 @@ class Consist(object):
                 unit_rows.append(('always_use_same_spriterow', 1))
             else:
                 # assumes visible_cargo is used to handle any other rows, no other cases at time of writing, could be changed eh?
-                unit_rows.extend(self.visible_cargo.get_output_row_counts_by_type())
+                unit_rows.extend(self.gestalt_graphics.get_output_row_counts_by_type())
             result.append(unit_rows)
         return result
-
-    @property
-    def graphics_processors(self):
-        # wrapper to get the graphics processors
-        template = self.id + '_template.png'
-        return graphics_utils.get_composited_cargo_processors(template = template)
 
     def get_engine_cost_points(self):
         # Up to 20 points for power. 1 point per 100hp
@@ -255,7 +226,8 @@ class Consist(object):
         for i in range(3):
             consist_capacity = 0
             for unit in self.units:
-                if self.default_cargo == 'MAIL':
+                # possibly fragile assumption that mail vehicles will always have to put mail first in default cargo list
+                if self.default_cargos[0] == 'MAIL':
                     consist_capacity += int(global_constants.mail_multiplier * unit.capacities[i])
                 else:
                     consist_capacity += unit.capacities[i]
@@ -304,14 +276,20 @@ class Consist(object):
             return self._power
 
     @property
-    def adjusted_model_life(self):
+    def model_life(self):
         similar_consists = []
         for consist in self.roster.consists:
             if type(consist) == type(self):
-                if consist.roadveh_flag_tram == self.roadveh_flag_tram:
-                    # !! this will need to account for roadtypes ^^
-                    print("adjusted_model_life will need to account for roadtype, not just tram flag")
-                    similar_consists.append(consist)
+                # the order of if statements here is specific and to split tram / road vehicles reliably
+                if self.roadveh_flag_tram:
+                    if consist.roadveh_flag_tram:
+                        # all trams are currently considered compatible, unless/until new tram_types are added
+                        similar_consists.append(consist)
+                else:
+                    if not consist.roadveh_flag_tram:
+                        if consist.road_type == self.road_type:
+                            # all road_types are currently considered to require exact match, unless/until new road_types are added
+                            similar_consists.append(consist)
         replacement_consist = None
         for consist in sorted(similar_consists, key=lambda consist: consist.intro_date):
             if consist.intro_date > self.intro_date:
@@ -320,39 +298,31 @@ class Consist(object):
         if replacement_consist is None:
             return 'VEHICLE_NEVER_EXPIRES'
         else:
-            return replacement_consist.intro_date - self.intro_date
+            # see comments for retire_early
+            # model life based on replacement date + 17 for max random intro date of replacement
+            return replacement_consist.intro_date - self.intro_date + 17
 
     @property
     def retire_early(self):
         # affects when vehicle is removed from buy menu (in combination with model life)
         # to understand why this is needed see https://newgrf-specs.tt-wiki.net/wiki/NML:Vehicles#Engine_life_cycle
-        return -10 # retire at end of model life + 10 (fudge factor - no need to be more precise than that)
-
+        # Pikka: that will keep it disappearing from the list at the same time, but extend the period of maximum reliability by n years, ie until the last ones built when they were the current gen are getting old
+        # retirement trigger is end of phase 2 - n; n needs to be: length of phase 1 (rnd, up to 3 years) + phase 2 offset (-8)
+        # then add 1 for safety with randomisation (ensure overlap is guaranteed with replacement)
+        return 3 - 8 - 1 # -ve value here is correct
 
     @property
     def sound_effect(self):
         # allow custom sound effects (set per subclass or vehicle)
-        if self._sound_effect:
+        if self._sound_effect is not None:
             return self._sound_effect
-        # is this vehicle steam? (relies on visual effect being set correctly)
-        for unit in self.units:
-            if len(unit.effects) > 0:
-                if 'STEAM' in unit.effects[0]:
-                    return 'SOUND_FACTORY_WHISTLE'
-        # otherwise
-        if self.roadveh_flag_tram:
-            return 'SOUND_CAR_HORN'
         else:
-            if self.default_cargo == 'PASS':
-                return 'SOUND_BUS_START_PULL_AWAY'
-            else:
-                return 'SOUND_TRUCK_START_2'
+            return self.default_sound_effect
 
     @property
     def buy_menu_width (self):
         # max sensible width in buy menu is 64px, but RH templates currently drawn at 36px - legacy stuff
         consist_length = 4 * sum([unit.vehicle_length for unit in self.units])
-        #print(self.id, consist_length)
         if consist_length < global_constants.buy_menu_sprite_width:
             return consist_length
         else:
@@ -369,10 +339,26 @@ class Consist(object):
         roster = self.roster
         return 'param[1]==' + str(roster.numeric_id - 1)
 
+    def get_nml_expression_for_default_cargos(self):
+        # sometimes first default cargo is not available, so we use a list
+        # this avoids unwanted cases like box cars defaulting to mail when goods cargo not available
+        # if there is only one default cargo, the list just has one entry, that's no problem
+        if len(self.default_cargos) == 1:
+            return self.default_cargos[0]
+        else:
+            # build stacked ternary operators for cargos
+            result = self.default_cargos[-1]
+            for cargo in reversed(self.default_cargos[0:-1]):
+                result = 'cargotype_available("' + cargo + '")?' + cargo + ':' + result
+            return result
+
     def render_articulated_switch(self):
-        template = templates["add_articulated_parts.pynml"]
-        nml_result = template(consist=self, global_constants=global_constants)
-        return nml_result
+        if len(self.units) > 1:
+            template = templates["articulated_parts.pynml"]
+            nml_result = template(consist=self, global_constants=global_constants)
+            return nml_result
+        else:
+            return ''
 
     def render(self):
         # templating
@@ -409,8 +395,10 @@ class RoadVehicle(object):
         # if the vehicle cargo area is not an OTTD unit length, use the next size up and the masking will sort it out
         # some longer vehicles may place multiple shorter cargo sprites, e.g. 7/8 vehicle, 2 * 4/8 cargo sprites (with some overlapping)
         self.cargo_length = kwargs.get('cargo_length', None)
+        # effects can be specified in detail per vehicle, or fall back to those defined by RoadVehicle subclass
         self._effect_spawn_model = kwargs.get('effect_spawn_model', None)
         self.effects = kwargs.get('effects', []) # default for effects is an empty list
+        self.default_effect_sprite = None # default is no effect sprite
 
     def get_capacity_variations(self, capacity):
         # capacity is variable, controlled by a newgrf parameter
@@ -493,20 +481,10 @@ class RoadVehicle(object):
     @property
     def vehicle_nml_template(self):
         if not self.always_use_same_spriterow:
-            if self.consist.visible_cargo.nml_template:
-                return self.consist.visible_cargo.nml_template
+            if self.consist.gestalt_graphics.nml_template:
+                return self.consist.gestalt_graphics.nml_template
         # default case
         return 'vehicle_default.pynml'
-
-    @property
-    def sg_depot(self):
-        suffix = "_switch_graphics_by_year"
-        return self.id + suffix
-
-    @property
-    def sg_default(self):
-        suffix = "_switch_graphics_by_year"
-        return self.id + suffix
 
     def get_cargo_suffix(self):
         return 'string(' + self.cargo_units_refit_menu + ')'
@@ -516,18 +494,22 @@ class RoadVehicle(object):
             if i not in global_constants.cargo_labels:
                 utils.echo_message("Warning: vehicle " + self.id + " references cargo label " + i + " which is not defined in the cargo table")
 
-    def get_expression_for_effects(self):
-        # provides part of nml switch for effects (smoke), or none if no effects defined
+    def get_effects(self):
+        # provides part of nml switch for effects (smoke), or none if no effects defined in vehicle or RoadVehicle subclass
+        result = []
         if len(self.effects) > 0:
-            result = []
             for index, effect in enumerate(self.effects):
                  result.append('STORE_TEMP(create_effect(' + effect + '), 0x10' + str(index) + ')')
-            return '[' + ','.join(result) + ']'
+        elif self.default_effect_sprite is not None:
+            result.append('STORE_TEMP(create_effect(' + self.default_effect_sprite + ', -2, 0, 10), 0x100)')
+        # only return a list if there's a list to return :P
+        if len(result) > 0:
+            return ['[' + ','.join(result) + ']', len(result)]
         else:
-            return 0
+            return [0, 0]
 
-    def get_nml_expression_for_cargo_variant_random_switch(self, variation_num, cargo_id=None):
-        switch_id = self.id + "_switch_graphics_" + str(variation_num) + ('_' + str(cargo_id) if cargo_id is not None else '')
+    def get_nml_expression_for_cargo_variant_random_switch(self, cargo_id=None):
+        switch_id = self.id + "_switch_graphics" + ('_' + str(cargo_id) if cargo_id is not None else '')
         return "SELF," + switch_id + ", bitmask(TRIGGER_VEHICLE_ANY_LOAD)"
 
     def render(self):
@@ -541,79 +523,41 @@ class RoadVehicle(object):
         return nml_result
 
 
-class ModelVariant(object):
-    # simple class to hold model variants
-    # variants are mostly randomised or date-sensitive graphics
-    # must be a minimum of one variant per vehicle
-    # at least one variant must have intro date 0 (for nml switch defaults to work)
-    def __init__(self, intro_date, end_date, spritesheet_suffix, graphics_processor):
-        self.intro_date = intro_date
-        self.end_date = end_date
-        self.spritesheet_suffix = spritesheet_suffix # use digits for these - to match spritesheet filenames
-        self.graphics_processor = graphics_processor
-
-    def get_spritesheet_name(self, consist):
-        return consist.id + '_' + str(self.spritesheet_suffix) + '.png'
-
-
-class CourierCar(Consist):
+class SteamRoadVehicle(RoadVehicle):
     """
-    Truck or tram for mail, valuables etc.
+    Unit for a steam vehicle, with over-rideable smoke
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.autorefit = True
-        self.class_refit_groups = ['mail', 'express_freight']
-        self.label_refits_allowed = [] # no specific labels needed
-        self.label_refits_disallowed = ['TOUR']
-        self.default_cargo = 'MAIL'
-        self.weight_multiplier = 0.2
+        self._effect_spawn_model = 'EFFECT_SPAWN_MODEL_STEAM'
+        self.default_effect_sprite = 'EFFECT_SPRITE_STEAM'
+        self.consist._power_type_suffix = 'STEAM'
+        self.consist.default_sound_effect = 'SOUND_FACTORY_WHISTLE'
 
 
-class PaxHauler(Consist):
+class DieselRoadVehicle(RoadVehicle):
     """
-    Bus or tram for pax.
+    Unit for a diesel vehicle, with over-rideable smoke
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.autorefit = True
-        self.class_refit_groups = ['pax']
-        self.label_refits_allowed = []
-        self.label_refits_disallowed = []
-        self.default_cargo = 'PASS'
-        self.loading_speed_multiplier = 3
-        self.weight_multiplier = 0.17
+        self._effect_spawn_model = 'EFFECT_SPAWN_MODEL_DIESEL'
+        self.default_effect_sprite = 'EFFECT_SPRITE_DIESEL'
+        self.consist._power_type_suffix = 'DIESEL'
+        # this can be over-ridden in consist subclasses for e.g. buses using consist._sound_effect
+        self.consist.default_sound_effect = 'SOUND_BUS_START_PULL_AWAY' # sound effect mis-named, original base set uses this for trucks
 
 
-class PaxExpressHauler(Consist):
+class ElectricRoadVehicle(RoadVehicle):
     """
-    Coach or express tram for pax.
+    Unit for an electric vehicle, with over-rideable sparks
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.autorefit = True
-        self.class_refit_groups = ['pax']
-        self.label_refits_allowed = []
-        self.label_refits_disallowed = []
-        self.default_cargo = 'PASS'
-        self.cargo_age_period = 2 * global_constants.CARGO_AGE_PERIOD
-        self.weight_multiplier = 0.2
-
-
-class OpenHauler(Consist):
-    """
-    General cargo tram or truck - refits everything except mail, pax.
-    """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.autorefit = True
-        self.class_refit_groups = ['all_freight']
-        self.label_refits_allowed = [] # no specific labels needed
-        self.label_refits_disallowed = ['TOUR', 'MAIL']
-        self.default_cargo = 'GOOD'
-        # Cargo Graphics
-        self.visible_cargo.bulk = True
-        self.visible_cargo.piece = True
+        self._effect_spawn_model = 'EFFECT_SPAWN_MODEL_ELECTRIC'
+        self.default_effect_sprite = 'EFFECT_SPRITE_ELECTRIC'
+        self.consist._power_type_suffix = 'ELECTRIC'
+        self.consist.default_sound_effect = 'SOUND_ELECTRIC_SPARK'
 
 
 class BoxHauler(Consist):
@@ -622,11 +566,28 @@ class BoxHauler(Consist):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._name_type_suffix = "BOX"
         self.autorefit = True
         self.class_refit_groups = ['packaged_freight']
         self.label_refits_allowed = ['MAIL', 'GRAI', 'WHEA', 'MAIZ', 'FRUT', 'BEAN', 'NITR'] # Iron Horse compatibility
         self.label_refits_disallowed = global_constants.disallowed_refits_by_label['non_freight_special_cases']
-        self.default_cargo = 'GOOD'
+        self.default_cargos = global_constants.default_cargos['box']
+        self.weight_multiplier = 0.45
+
+
+class CoveredHopperHauler(Consist):
+    """
+    Covered hopper truck or tram for bulk powder cargos.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._name_type_suffix = "COVERED_HOPPER"
+        self.autorefit = True
+        self.class_refit_groups = ['covered_hopper_freight']
+        self.label_refits_allowed = ['GRAI', 'WHEA', 'MAIZ', 'SUGR', 'FMSP', 'RFPR', 'CLAY', 'BDMT', 'BEAN', 'NITR', 'RUBR', 'SAND', 'POTA', 'QLME', 'SASH', 'CMNT', 'KAOL', 'FERT', 'SALT']
+        self.label_refits_disallowed = []
+        self.default_cargos = global_constants.default_cargos['covered_hopper']
+        self.loading_speed_multiplier = 2
         self.weight_multiplier = 0.45
 
 
@@ -636,60 +597,49 @@ class DumpHauler(Consist):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._name_type_suffix = "DUMP"
         self.autorefit = True
         self.class_refit_groups = ['dump_freight']
         self.label_refits_allowed = [] # no specific labels needed
         self.label_refits_disallowed = global_constants.disallowed_refits_by_label['non_dump_bulk']
-        self.default_cargo = 'COAL'
+        self.default_cargos = global_constants.default_cargos['dump']
         self.loading_speed_multiplier = 2
         self.weight_multiplier = 0.45
-        # Cargo graphics
-        self.visible_cargo.bulk = True
+        # Graphics configuration
+        self.gestalt_graphics = GestaltGraphicsVisibleCargo(bulk=True)
 
 
-class FlatBedHauler(Consist):
+class EdiblesTanker(Consist):
+    """
+    Wine, milk, water etc.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._name_type_suffix = "EDIBLES_TANKER"
+        self.autorefit = True
+        self.class_refit_groups = ['liquids']
+        self.label_refits_allowed = ['MILK', 'FOOD']
+        self.label_refits_disallowed = global_constants.disallowed_refits_by_label['non_edible_liquids']
+        self.default_cargos = global_constants.default_cargos['edibles_tank']
+        self.loading_speed_multiplier = 2
+        self.cargo_age_period = 2 * global_constants.CARGO_AGE_PERIOD
+        self.weight_multiplier = 0.5
+
+
+class FlatHauler(Consist):
     """
     Flatbed tram or truck - refits most cargos, not bulk.
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._name_type_suffix = "FLATBED"
         self.autorefit = True
         self.class_refit_groups = ['flatbed_freight']
         self.label_refits_allowed = ['GOOD']
         self.label_refits_disallowed = global_constants.disallowed_refits_by_label['non_flatbed_freight']
-        self.default_cargo = 'STEL'
-        # Cargo graphics
-        self.visible_cargo.piece = True
-
-
-class BulkPowderHauler(Consist):
-    """
-    Covered hopper truck or tram for bulk powder cargos.
-    """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.autorefit = True
-        self.class_refit_groups = ['covered_hopper_freight']
-        self.label_refits_allowed = ['GRAI', 'WHEA', 'MAIZ', 'FOOD', 'SUGR', 'FMSP', 'RFPR', 'CLAY', 'BDMT', 'BEAN', 'NITR', 'RUBR', 'SAND', 'POTA', 'QLME', 'FERT']
-        self.label_refits_disallowed = []
-        self.default_cargo = 'GRAI'
-        self.loading_speed_multiplier = 2
-        self.weight_multiplier = 0.45
-
-
-class LivestockHauler(Consist):
-    """
-    Livestock truck or tram.
-    """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.autorefit = True
-        self.class_refit_groups = []
-        self.label_refits_allowed = ['LVST']
-        self.label_refits_disallowed = []
-        self.default_cargo = 'LVST'
-        self.cargo_age_period = 2 * global_constants.CARGO_AGE_PERIOD
-        self.weight_multiplier = 0.45
+        self.default_cargos = global_constants.default_cargos['flat']
+        # Graphics configuration
+        self.gestalt_graphics = GestaltGraphicsVisibleCargo(piece='flat')
 
 
 class FruitVegHauler(Consist):
@@ -698,13 +648,175 @@ class FruitVegHauler(Consist):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._name_type_suffix = "FRUIT_VEG"
         self.autorefit = True
         self.class_refit_groups = []
         self.label_refits_allowed = ['FRUT', 'BEAN', 'CASS', 'JAVA', 'NUTS']
         self.label_refits_disallowed = []
-        self.default_cargo = 'FRUT'
+        self.default_cargos = global_constants.default_cargos['fruit_veg']
         self.cargo_age_period = 2 * global_constants.CARGO_AGE_PERIOD
         self.weight_multiplier = 0.45
+
+
+class IntermodalHauler(Consist):
+    """
+    Specialist intermodal (container) truck, limited range of cargos.  Keep same refit and speeds as BoxHauler
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._name_type_suffix = "INTERMODAL"
+        self.autorefit = True
+        self.class_refit_groups = ['packaged_freight']
+        self.label_refits_allowed = global_constants.allowed_refits_by_label['box_freight']
+        self.label_refits_disallowed = global_constants.disallowed_refits_by_label['non_freight_special_cases']
+        self.default_cargos = global_constants.default_cargos['box']
+        self.loading_speed_multiplier = 2
+
+
+class LivestockHauler(Consist):
+    """
+    Livestock truck or tram.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._name_type_suffix = "LIVESTOCK"
+        self.autorefit = True
+        self.class_refit_groups = []
+        self.label_refits_allowed = ['LVST']
+        self.label_refits_disallowed = []
+        self.default_cargos = ['LVST'] # no need for fallbacks, only one cargo
+        self.cargo_age_period = 2 * global_constants.CARGO_AGE_PERIOD
+        self.weight_multiplier = 0.45
+
+
+class LogHauler(Consist):
+    """
+    Gets wood.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._name_type_suffix = "LOG"
+        self.autorefit = True
+        self.class_refit_groups = []
+        self.label_refits_allowed = ['WOOD']
+        self.label_refits_disallowed = []
+        self.default_cargos = ['WOOD'] # no need for fallbacks, only one cargo
+        self.loading_speed_multiplier = 2
+        # Cargo graphics
+        self.gestalt_graphics = GestaltGraphicsCustom({'WOOD': [0]},
+                                                'vehicle_with_visible_cargo.pynml',
+                                                generic_rows = [0])
+
+
+class MailHauler(Consist):
+    """
+    Truck or tram for mail, valuables etc.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._name_type_suffix = "MAIL"
+        self.autorefit = True
+        self.class_refit_groups = ['mail', 'express_freight']
+        self.label_refits_allowed = [] # no specific labels needed
+        self.label_refits_disallowed = ['TOUR']
+        self.default_cargos = global_constants.default_cargos['mail']
+        self.weight_multiplier = 0.2
+        if not self.roadveh_flag_tram:
+            self._sound_effect = 'SOUND_TRUCK_START'
+
+
+class MetalHauler(Consist):
+    """
+    Specialist heavy haul tram / truck, e.g. multiwheel platform, steel mill hauler etc.
+    High capacity, not very fast, refits to small subset of finished metal cargos.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._name_type_suffix = "METAL"
+        self.autorefit = True
+        self.class_refit_groups = []
+        self.label_refits_allowed = ['STEL', 'COPR', 'IRON', 'SLAG']
+        self.label_refits_disallowed = []
+        self.default_cargos = global_constants.default_cargos['metal']
+        self.loading_speed_multiplier = 2
+
+
+class OpenHauler(Consist):
+    """
+    General cargo tram or truck - refits everything except mail, pax.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._name_type_suffix = "OPEN"
+        self.autorefit = True
+        self.class_refit_groups = ['all_freight']
+        self.label_refits_allowed = [] # no specific labels needed
+        self.label_refits_disallowed = ['TOUR']
+        self.default_cargos = global_constants.default_cargos['open']
+        # Graphics configuration
+        self.gestalt_graphics = GestaltGraphicsVisibleCargo(bulk=True,
+                                                            piece='open')
+
+
+class PaxHaulerBase(Consist):
+    """
+    Common base class for pax vehicles.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.autorefit = True
+        self.class_refit_groups = ['pax']
+        self.label_refits_allowed = []
+        self.label_refits_disallowed = []
+        self.default_cargos = global_constants.default_cargos['pax']
+
+
+class PaxHauler(PaxHaulerBase):
+    """
+    Bus or tram for pax.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.loading_speed_multiplier = 3
+        self.weight_multiplier = 0.17
+        # sound effects are faff, interacts with RoadVehicle subclass too
+        if self.roadveh_flag_tram:
+            self._sound_effect = 'SOUND_LEVEL_CROSSING'
+        else:
+            self._sound_effect = 'SOUND_BUS_START_PULL_AWAY_WITH_HORN'
+
+
+    @property
+    def name_type_suffix(self):
+        # special case handling for name suffix strings
+        if self.roadveh_flag_tram:
+            return "STR_NAME_SUFFIX_PASSENGER_TRAM"
+        else:
+            return "STR_NAME_SUFFIX_BUS"
+
+
+class PaxExpressHauler(PaxHaulerBase):
+    """
+    Coach or express tram for pax.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._name_type_suffix = "COACH" # other magic applies this only to road vehicles, trams will still be "TRAM"
+        self.cargo_age_period = 2 * global_constants.CARGO_AGE_PERIOD
+        self.weight_multiplier = 0.2
+        # sound effects are faff, interacts with RoadVehicle subclass too
+        if self.roadveh_flag_tram:
+            self._sound_effect = 'SOUND_LEVEL_CROSSING'
+        else:
+            self._sound_effect = 'SOUND_TRUCK_START_2'
+
+    @property
+    def name_type_suffix(self):
+        # special case handling for name suffix strings
+        if self.roadveh_flag_tram:
+            return "STR_NAME_SUFFIX_PASSENGER_TRAM"
+        else:
+            return "STR_NAME_SUFFIX_COACH"
 
 
 class RefrigeratedHauler(Consist):
@@ -714,83 +826,14 @@ class RefrigeratedHauler(Consist):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._name_type_suffix = "REEFER"
         self.autorefit = True
         self.class_refit_groups = ['refrigerated_freight']
         self.label_refits_allowed = [] # no specific labels needed, refits all cargos that have refrigerated class
         self.label_refits_disallowed = []
-        self.default_cargo = 'FOOD'
+        self.default_cargos = global_constants.default_cargos['reefer']
         self.cargo_age_period = 2 * global_constants.CARGO_AGE_PERIOD
         self.weight_multiplier = 0.5
-
-
-class Tanker(Consist):
-    """
-    Ronseal ("does what it says on the tin", for those without extensive knowledge of UK advertising).
-    """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # tankers are unrealistically autorefittable, and at no cost
-        # Pikka: if people complain that it's unrealistic, tell them "don't do it then"
-        # they also change livery at stations if refitted between certain cargo types <shrug>
-        self.autorefit = True
-        self.class_refit_groups = ['liquids']
-        self.label_refits_allowed = []
-        self.label_refits_disallowed = global_constants.disallowed_refits_by_label['edible_liquids']
-        self.default_cargo = 'OIL_'
-        self.loading_speed_multiplier = 2
-        self.weight_multiplier = 0.45
-        # Cargo graphics
-        self.visible_cargo = VisibleCargoLiveryOnly()
-        self.visible_cargo.tanker = True
-
-
-class EdiblesTanker(Consist):
-    """
-    Wine, milk, water etc.
-    """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.autorefit = True
-        self.class_refit_groups = ['liquids']
-        self.label_refits_allowed = ['MILK', 'FOOD']
-        self.label_refits_disallowed = global_constants.disallowed_refits_by_label['non_edible_liquids']
-        self.default_cargo = 'WATR'
-        self.loading_speed_multiplier = 2
-        self.cargo_age_period = 2 * global_constants.CARGO_AGE_PERIOD
-        self.weight_multiplier = 0.5
-
-
-class LogHauler(Consist):
-    """
-    Gets wood.
-    """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.autorefit = True
-        self.class_refit_groups = []
-        self.label_refits_allowed = ['WOOD']
-        self.label_refits_disallowed = []
-        self.default_cargo = 'WOOD'
-        self.loading_speed_multiplier = 2
-        # Cargo graphics
-        self.visible_cargo = VisibleCargoCustom({'WOOD': [0]},
-                                                'vehicle_with_visible_cargo.pynml',
-                                                generic_rows = [0])
-
-
-class FoundryHauler(Consist):
-    """
-    Specialist heavy haul tram / truck, e.g. multiwheel platform, steel mill hauler etc.
-    High capacity, not very fast, refits to small subset of finished metal cargos.
-    """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.autorefit = True
-        self.class_refit_groups = []
-        self.label_refits_allowed = ['STEL', 'COPR']
-        self.label_refits_disallowed = []
-        self.default_cargo = 'STEL'
-        self.loading_speed_multiplier = 2
 
 
 class SuppliesHauler(Consist):
@@ -799,31 +842,38 @@ class SuppliesHauler(Consist):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._name_type_suffix = "SUPPLIES"
         self.autorefit = True
         self.class_refit_groups = []
         self.label_refits_allowed = ['ENSP', 'FMSP', 'VEHI', 'BDMT']
         self.label_refits_disallowed = []
-        self.default_cargo = 'ENSP'
+        self.default_cargos = global_constants.default_cargos['supplies']
         self.loading_speed_multiplier = 2
         self.weight_multiplier = 0.5
-        # Cargo graphics
-        self.visible_cargo = VisibleCargoCustom({'ENSP': [0], 'FMSP': [0], 'VEHI': [0]},
-                                                'vehicle_with_visible_cargo.pynml',
-                                                generic_rows = [0])
+        # Graphics configuration
+        self.gestalt_graphics = GestaltGraphicsCustom({'ENSP': [0], 'FMSP': [0], 'VEHI': [0]},
+                                                       'vehicle_with_visible_cargo.pynml',
+                                                       generic_rows = [0])
 
 
-class IntermodalHauler(Consist):
+class Tanker(Consist):
     """
-    Specialist intermodal (container) truck, limited range of cargos.
+    Ronseal ("does what it says on the tin", for those without extensive knowledge of UK advertising).
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._name_type_suffix = "TANKER"
+        # tankers are unrealistically autorefittable, and at no cost
+        # Pikka: if people complain that it's unrealistic, tell them "don't do it then"
+        # they also change livery at stations if refitted between certain cargo types <shrug>
         self.autorefit = True
-        # maintain other sets (e.g. IH etc) when changing container refits
-        self.class_refit_groups = ['express_freight','packaged_freight']
-        self.label_refits_allowed = ['FRUT','WATR']
-        self.label_refits_disallowed = ['FISH','LVST','OIL_','TOUR','WOOD']
-        self.default_cargo = 'GOOD'
+        self.class_refit_groups = ['liquids']
+        self.label_refits_allowed = []
+        self.label_refits_disallowed = global_constants.disallowed_refits_by_label['edible_liquids']
+        self.default_cargos = global_constants.default_cargos['tank']
         self.loading_speed_multiplier = 2
+        self.weight_multiplier = 0.45
+        # Graphics configuration
+        self.gestalt_graphics = GestaltGraphicsLiveryOnly(recolour_maps=polar_fox.constants.tanker_livery_recolour_maps)
 
 

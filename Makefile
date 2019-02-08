@@ -4,9 +4,7 @@ PYTHON3 = python3
 SED = sed
 ZIP = zip
 
-#NMLC = nmlc
-# temp to get a build whilst sorting out bad branch strategy
-NMLC = ../../tools/nml-andythenorth/nmlc
+NMLC = nmlc
 GRFID = grfid
 
 HG_INFO = bin/hg-info
@@ -115,6 +113,8 @@ bundle_src: $(MD5_FILE)
 
 # this is a macOS-specifc install location; the pre-2017 Makefile handled multiple platforms, that could be restored if needed
 install: $(GRF_FILE)
+    # remove first, OpenTTD does not like having the _contents_ of the current file change under it, but will handle a removed-and-replaced file correctly
+	rm ~/Documents/OpenTTD/newgrf/$(PROJECT_NAME).grf
 	cp $(GRF_FILE) ~/Documents/OpenTTD/newgrf/
 
 clean:

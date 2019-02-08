@@ -12,6 +12,7 @@ import road_hog
 import utils
 import global_constants
 from rosters import registered_rosters # Iron Horse has support for compiling only active roster, copy if/when needed
+from time import time
 
 # get args passed by makefile
 makefile_args = utils.get_makefile_args(sys)
@@ -40,6 +41,9 @@ def render_consist_nml(consist):
     return result
 
 def main():
+    start = time()
+    print(road_hog.vacant_numeric_ids_formatted())
+
     generated_nml_path = os.path.join(generated_files_path, 'nml')
     if not os.path.exists(generated_nml_path):
         os.mkdir(generated_nml_path) # reminder to self: inside main() to avoid modifying filesystem simply by importing module
@@ -47,15 +51,18 @@ def main():
 
     consists = road_hog.get_consists_in_buy_menu_order()
 
-    header_items = ['header', 'cargo_table', 'roadtypes_tramtypes']
+    # if NRT gets done
+    # header_items = ['header', 'cargo_table', 'roadtypes_tramtypes']
+    header_items = ['header', 'cargo_table']
     for header_item in header_items:
         grf_nml.write(render_header_item_nml(header_item, consists))
 
     # multiprocessing was tried here and removed as it was empirically slower in testing (due to overhead of starting extra pythons probably)
     for consist in consists:
         grf_nml.write(render_consist_nml(consist))
-
     grf_nml.close()
+    # eh, how long does this take anyway?
+    print(format((time() - start), '.2f')+'s')
 
 if __name__ == '__main__':
     main()
