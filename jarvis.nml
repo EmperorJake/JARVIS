@@ -1,0 +1,226 @@
+grf {
+	grfid: "\4A\4B\66\01";
+	name: string(STR_GRF_NAME);
+	desc: string(STR_GRF_DESCRIPTION);
+	version: 1;
+	min_compatible_version: 1;
+}
+
+
+
+template template_2cc_std(x, y) {
+    //[left_x, upper_y, width, height, offset_x, offset_y]
+    [x    , y,  8, 24,  -3, -12]
+    [x+9  , y, 22, 20, -14, -12]
+    [x+32 , y, 32, 16, -16, -12]
+    [x+65 , y, 22, 20,  -6, -12]
+    [x+88 , y,  8, 24,  -3, -12]
+    [x+97 , y, 22, 20, -14, -12]
+    [x+120, y, 32, 16, -16, -12]
+    [x+153, y, 22, 20,  -6, -12]
+}
+
+template template_2cc_dolly(x, y) {
+    //[left_x, upper_y, width, height, offset_x, offset_y]
+    [x    , y,  8, 24,  -3, -12]
+    [x+9  , y, 22, 20, -14, -12]
+    [x+32 , y, 32, 16,  -8, -12]
+    [x+65 , y, 22, 20,  -6, -12]
+    [x+88 , y,  8, 24,  -3, -12]
+    [x+97 , y, 22, 20, -14, -12]
+    [x+120, y, 32, 16, -24, -12]
+    [x+153, y, 22, 20,  -6, -12]
+}
+
+template template_2cc_primemover(x, y) {
+    //[left_x, upper_y, width, height, offset_x, offset_y]
+    [x    , y,  8, 24,  -3, -12]
+    [x+9  , y, 22, 20, -14, -12]
+    [x+32 , y, 32, 16, -12, -12]
+    [x+65 , y, 22, 20,  -6, -12]
+    [x+88 , y,  8, 24,  -3, -12]
+    [x+97 , y, 22, 20, -14, -12]
+    [x+120, y, 32, 16, -20, -12]
+    [x+153, y, 22, 20,  -6, -12]
+}
+
+spriteset(spriteset_primemover_majestic, "gfx/majestic.png") {
+	template_2cc_primemover(1, 1)
+}
+
+spriteset(spriteset_dolly_2A, "gfx/trailers.png") {
+	template_2cc_dolly(1, 1)
+}
+
+spriteset(spriteset_trailer_A_8L_3A, "gfx/trailers.png") {
+	template_2cc_std(1, 32)
+}
+
+roadtypetable {
+	ROAD,
+}
+
+
+switch (FEAT_ROADVEHS, PARENT, majestic_a1_articulated, extra_callback_info1) {
+	1: return trailer_A_8L_3A;
+	return CB_RESULT_NO_MORE_ARTICULATED_PARTS;
+}
+
+
+
+item (FEAT_ROADVEHS, majestic_a1, 1000) {
+    property {
+        sprite_id: SPRITE_ID_NEW_ROADVEH;
+        misc_flags: bitmask(ROADVEH_FLAG_2CC);
+        road_type: ROAD;
+        name: string(STR_NAME_MAJESTIC, STR_BLANK, STR_NAME_CONFIG_SEMI, STR_NAME_CARGO_BOX);
+        climates_available: ALL_CLIMATES;
+        introduction_date: date(2000,1,1);
+        speed: 120 km/h;
+        tractive_effort_coefficient:    1;
+        air_drag_coefficient: 0;
+        power: 800 hp;
+        cargo_capacity: 0;
+        refittable_cargo_classes: ALL_NORMAL_CARGO_CLASSES;
+		non_refittable_cargo_classes: bitmask(CC_PASSENGERS);
+        weight: 15;
+        loading_speed: 20;
+        reliability_decay: 55;
+        model_life: 35;
+        vehicle_life: 20;
+        cost_factor: 20;
+        running_cost_factor: 255;
+        running_cost_base: RUNNING_COST_ROADVEH;
+		length: 3;
+    }
+    graphics {
+		articulated_part: majestic_a1_articulated;
+        default: spriteset_primemover_majestic;
+    }
+
+}
+
+switch (FEAT_ROADVEHS, PARENT, majestic_a2_articulated, extra_callback_info1) {
+	1: return trailer_A_8L_3A;
+	2: return dolly_2A;
+	3: return trailer_A_8L_3A;
+	return CB_RESULT_NO_MORE_ARTICULATED_PARTS;
+}
+
+item (FEAT_ROADVEHS, majestic_a2, 1001) {
+    property {
+        sprite_id: SPRITE_ID_NEW_ROADVEH;
+        misc_flags: bitmask(ROADVEH_FLAG_2CC);
+        road_type: ROAD;
+        name: string(STR_NAME_MAJESTIC);
+        climates_available: ALL_CLIMATES;
+        introduction_date: date(2000,1,1);
+        speed: 120 km/h;
+        tractive_effort_coefficient:    1;
+        air_drag_coefficient: 0;
+        power: 800 hp;
+        cargo_capacity: 0;
+        refittable_cargo_classes: ALL_NORMAL_CARGO_CLASSES;
+		non_refittable_cargo_classes: bitmask(CC_PASSENGERS);
+        weight: 15;
+        loading_speed: 20;
+        reliability_decay: 55;
+        model_life: 35;
+        vehicle_life: 20;
+        cost_factor: 20;
+        running_cost_factor: 255;
+        running_cost_base: RUNNING_COST_ROADVEH;
+		length: 3;
+    }
+    graphics {
+		articulated_part: majestic_a2_articulated;
+        default: spriteset_primemover_majestic;
+    }
+
+}
+
+switch (FEAT_ROADVEHS, PARENT, majestic_a3_articulated, extra_callback_info1) {
+	1: return trailer_A_8L_3A;
+	2: return dolly_2A;
+	3: return trailer_A_8L_3A;
+	4: return dolly_2A;
+	5: return trailer_A_8L_3A;
+	return CB_RESULT_NO_MORE_ARTICULATED_PARTS;
+}
+
+item (FEAT_ROADVEHS, majestic_a3, 1003) {
+    property {
+        sprite_id: SPRITE_ID_NEW_ROADVEH;
+        misc_flags: bitmask(ROADVEH_FLAG_2CC);
+        road_type: ROAD;
+        name: string(STR_NAME_MAJESTIC);
+        climates_available: ALL_CLIMATES;
+        introduction_date: date(2000,1,1);
+        speed: 120 km/h;
+        tractive_effort_coefficient:    1;
+        air_drag_coefficient: 0;
+        power: 800 hp;
+        cargo_capacity: 0;
+        refittable_cargo_classes: ALL_NORMAL_CARGO_CLASSES;
+		non_refittable_cargo_classes: bitmask(CC_PASSENGERS);
+        weight: 15;
+        loading_speed: 20;
+        reliability_decay: 55;
+        model_life: 35;
+        vehicle_life: 20;
+        cost_factor: 20;
+        running_cost_factor: 255;
+        running_cost_base: RUNNING_COST_ROADVEH;
+		length: 3;
+    }
+    graphics {
+		articulated_part: majestic_a3_articulated;
+        default: spriteset_primemover_majestic;
+    }
+
+}
+
+
+// trailers
+
+item (FEAT_ROADVEHS, trailer_A_8L_3A, 2000) {
+    property {
+        sprite_id: SPRITE_ID_NEW_ROADVEH;
+        misc_flags: bitmask(ROADVEH_FLAG_2CC);
+        road_type: ROAD;
+        climates_available: NO_CLIMATE;
+        introduction_date: date(0,1,1);
+        cargo_capacity: 80;
+        refittable_cargo_classes: ALL_NORMAL_CARGO_CLASSES;
+		non_refittable_cargo_classes: bitmask(CC_PASSENGERS);
+        weight: 15;
+        loading_speed: 20;
+		length: 8;
+
+    }
+    graphics {
+
+        default: spriteset_trailer_A_8L_3A;
+    }
+
+}
+
+item (FEAT_ROADVEHS, dolly_2A, 9002) {
+    property {
+        sprite_id: SPRITE_ID_NEW_ROADVEH;
+        misc_flags: bitmask(ROADVEH_FLAG_2CC);
+        road_type: ROAD;
+        climates_available: NO_CLIMATE;
+        introduction_date: date(0,1,1);
+        cargo_capacity: 0;
+        weight: 15;
+        loading_speed: 20;
+		length: 1;
+
+    }
+    graphics {
+
+        default: spriteset_dolly_2A;
+    }
+
+}

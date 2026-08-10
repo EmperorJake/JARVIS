@@ -1,0 +1,25 @@
+switch (FEAT_ROADVEHS, SELF, dolly_2A_ui, getbits(extra_callback_info1, 0, 8)) {
+	0x10..0xFF: spriteset_dolly_2A_ui;
+	spriteset_dolly_2A;
+}
+
+item (FEAT_ROADVEHS, dolly_2A, 9002) {
+    property {
+        sprite_id: SPRITE_ID_NEW_ROADVEH;
+        misc_flags: bitmask(ROADVEH_FLAG_2CC);
+        road_type: ROAD;
+        climates_available: NO_CLIMATE;
+        introduction_date: date(0,1,1);
+        cargo_capacity: 0;
+        weight: 15;
+        loading_speed: 20;
+		length: 1;
+
+    }
+    graphics {
+
+        default: dolly_2A_ui;
+//		purchase: spriteset_dolly_2A_ui;
+    }
+
+}

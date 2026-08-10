@@ -1,0 +1,42 @@
+switch (FEAT_ROADVEHS, SELF, switch_trailer_curtainside_A_8L_4A_chassis, STORE_TEMP(CB_FLAG_MORE_SPRITES | PALETTE_USE_DEFAULT, 0x100)) {
+    return spriteset_chassis_A_8L_4A;
+}
+
+switch (FEAT_ROADVEHS, SELF, switch_trailer_curtainside_A_8L_4A_cargobox, STORE_TEMP(CB_FLAG_MORE_SPRITES | PALETTE_USE_DEFAULT, 0x100)) {
+    return spriteset_cargo_box_curtainside_8L;
+}
+
+/* only needed for bulk trucks
+switch (FEAT_ROADVEHS, SELF, switch_trailer_curtainside_A_8L_4A_load, STORE_TEMP(switch_bulk_recolour(), 0x100)) {
+    return spritegroup_bulk_overlay;
+}
+*/
+
+switch (FEAT_ROADVEHS, SELF, switch_trailer_curtainside_A_8L_4A_spritestack, getbits(extra_callback_info1, 8, 8)) {
+    0: return switch_trailer_curtainside_A_8L_4A_chassis;
+    return switch_trailer_curtainside_A_8L_4A_cargobox;
+}
+
+
+
+item (FEAT_ROADVEHS, trailer_curtainside_A_8L_4A, 9084) {
+    property {
+        sprite_id: SPRITE_ID_NEW_ROADVEH;
+        misc_flags: bitmask(ROADVEH_FLAG_2CC, ROADVEH_FLAG_SPRITE_STACK);
+        road_type: ROAD;
+        climates_available: NO_CLIMATE;
+        introduction_date: date(0,1,1);
+        cargo_capacity: 50;
+        refittable_cargo_classes: ALL_NORMAL_CARGO_CLASSES;
+		non_refittable_cargo_classes: bitmask(CC_PASSENGERS);
+        weight: 15;
+        loading_speed: 20;
+		length: 8;
+
+    }
+    graphics {
+
+        default: switch_trailer_curtainside_A_8L_4A_spritestack;
+    }
+
+}

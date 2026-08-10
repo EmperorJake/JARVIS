@@ -1,0 +1,41 @@
+switch (FEAT_ROADVEHS, PARENT, majestic_a3_articulated, extra_callback_info1) {
+	1: return trailer_curtainside_A_8L_4A;
+	2: return dolly_3A;
+	3: return trailer_curtainside_A_8L_4A;
+	4: return dolly_3A;
+	5: return trailer_curtainside_A_8L_4A;
+	return CB_RESULT_NO_MORE_ARTICULATED_PARTS;
+}
+
+item (FEAT_ROADVEHS, majestic_M_A3_BOX, 57045) {
+    property {
+        sprite_id: SPRITE_ID_NEW_ROADVEH;
+        misc_flags: bitmask(ROADVEH_FLAG_2CC);
+        road_type: ROAD;
+        name: string(STR_NAME_MAJESTIC, string(STR_BLANK), string(STR_NAME_CONFIG_A3), string(STR_NAME_CARGO_BOX));
+        climates_available: ALL_CLIMATES;
+        introduction_date: date(2000,1,1);
+        speed: 120 km/h;
+        tractive_effort_coefficient:    1;
+        air_drag_coefficient: 0;
+        power: 800 hp;
+        cargo_capacity: 0;
+        refittable_cargo_classes: ALL_NORMAL_CARGO_CLASSES;
+		non_refittable_cargo_classes: bitmask(CC_PASSENGERS);
+        weight: 15;
+        loading_speed: 20;
+        reliability_decay: 55;
+        model_life: 35;
+        vehicle_life: 20;
+        cost_factor: 20;
+        running_cost_factor: 255;
+        running_cost_base: RUNNING_COST_ROADVEH;
+		length: 3;
+		variant_group: majestic_M_A1_BOX;
+    }
+    graphics {
+		articulated_part: majestic_a3_articulated;
+        default: switch_primemover_majestic_ui;
+    }
+
+}

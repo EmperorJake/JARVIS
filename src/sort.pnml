@@ -1,0 +1,11 @@
+//sort in depot //could change to item names instead of ID numbers
+
+//variants should be sorted in order too so they show up correctly in replace window
+
+/*
+sort(FEAT_ROADVEHS, [
+
+todo
+
+]);
+*/

@@ -1,0 +1,21 @@
+#include "src/header.pnml"
+#include "src/constants.pnml"
+#include "src/cargotable.pnml"
+#include "src/roadtypetable.pnml"
+#include "src/sort.pnml"
+#include "src/template.pnml"
+#include "src/recolour.pnml"
+#include "src/spritesets.pnml"
+
+#include "src/dollies/dolly_1A.pnml"
+#include "src/dollies/dolly_2A.pnml"
+#include "src/dollies/dolly_3A.pnml"
+
+#include "src/trailers/trailer_curtainside_A_8L_2AS.pnml"
+#include "src/trailers/trailer_curtainside_A_8L_2A.pnml"
+#include "src/trailers/trailer_curtainside_A_8L_3A.pnml"
+#include "src/trailers/trailer_curtainside_A_8L_4A.pnml"
+
+#include "src/trucks/majestic_M_A1_BOX.pnml"
+#include "src/trucks/majestic_M_A2_BOX.pnml"
+#include "src/trucks/majestic_M_A3_BOX.pnml"

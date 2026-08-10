@@ -1,0 +1,74 @@
+//spritesets
+
+//rigids
+
+
+
+
+//prime movers
+
+spriteset(spriteset_primemover_majestic, "gfx/majestic.png") {
+	template_2cc_primemover(1, 1)
+}
+
+spriteset(spriteset_primemover_majestic_ui, "gfx/majestic.png") {
+	template_2cc_primemover_ui(1, 1)
+}
+
+//dollies
+
+spriteset(spriteset_dolly_1A, "gfx/dollies.png") {
+	template_2cc_dolly(1, 1)
+}
+
+spriteset(spriteset_dolly_1A_ui, "gfx/dollies.png") {
+	template_2cc_ui(1, 1)
+}
+
+spriteset(spriteset_dolly_2A, "gfx/dollies.png") {
+	template_2cc_dolly(1, 32)
+}
+
+spriteset(spriteset_dolly_2A_ui, "gfx/dollies.png") {
+	template_2cc_ui(1, 32)
+}
+
+spriteset(spriteset_dolly_3A, "gfx/dollies.png") {
+	template_2cc_dolly(1, 64)
+}
+
+spriteset(spriteset_dolly_3A_ui, "gfx/dollies.png") {
+	template_2cc_ui(1, 64)
+}
+
+//trailer chassis
+
+spriteset(spriteset_chassis_A_8L_2AS, "gfx/chassis_A_8L.png") {
+	template_2cc_std(1, 1)
+}
+
+spriteset(spriteset_chassis_A_8L_2A, "gfx/chassis_A_8L.png") {
+	template_2cc_std(1, 32)
+}
+
+spriteset(spriteset_chassis_A_8L_3A, "gfx/chassis_A_8L.png") {
+	template_2cc_std(1, 64)
+}
+
+spriteset(spriteset_chassis_A_8L_4A, "gfx/chassis_A_8L.png") {
+	template_2cc_std(1, 96)
+}
+
+//cargo boxes
+
+spriteset(spriteset_cargo_box_curtainside_8L, "gfx/cargo_box_8L.png") {
+	template_2cc_std(1, 1)
+}
+
+
+//prime mover gfx switch
+
+switch (FEAT_ROADVEHS, SELF, switch_primemover_majestic_ui, getbits(extra_callback_info1, 0, 8)) {
+	0x10..0xFF: spriteset_primemover_majestic_ui;
+	spriteset_primemover_majestic;
+}

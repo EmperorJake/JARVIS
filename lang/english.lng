@@ -1,0 +1,28 @@
+##grflangid 0x01
+
+lang: 7F
+
+STR_GRF_NAME :JARVIS Alpha
+STR_GRF_DESCRIPTION :Jake's Australian Road Vehicle Inspired Set. By Emperor Jake.
+
+STR_NAME_MAJESTIC	:Majestic{STRING}{STRING}{STRING}
+
+STR_BLANK			:
+
+
+
+STR_NAME_PRIME_MOVER	: Prime Mover
+STR_NAME_RIGID			: Rigid
+
+STR_NAME_CONFIG_SEMI	: Semi Trailer
+STR_NAME_CONFIG_A2		: A-Double
+STR_NAME_CONFIG_A3		: A-Triple
+
+STR_NAME_CARGO_BOX		: Box Truck
+STR_NAME_CARGO_TANK		: Tanker Truck
+STR_NAME_CARGO_BULK		: Dump Truck
+
+STR_NAME_SIZE_SMALL		: Mini
+STR_NAME_SIZE_MEDIUM	: Standard
+STR_NAME_SIZE_LARGE		: Super
+
