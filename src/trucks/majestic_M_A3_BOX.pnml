@@ -1,9 +1,9 @@
 switch (FEAT_ROADVEHS, PARENT, majestic_a3_articulated, extra_callback_info1) {
-	1: return trailer_curtainside_A_8L_4A;
-	2: return dolly_3A;
-	3: return trailer_curtainside_A_8L_4A;
-	4: return dolly_3A;
-	5: return trailer_curtainside_A_8L_4A;
+	1: return trailer_curtainside_A_8L_3A;
+	2: return dolly_2A;
+	3: return trailer_curtainside_A_8L_3A;
+	4: return dolly_2A;
+	5: return trailer_curtainside_A_8L_3A;
 	return CB_RESULT_NO_MORE_ARTICULATED_PARTS;
 }
 
