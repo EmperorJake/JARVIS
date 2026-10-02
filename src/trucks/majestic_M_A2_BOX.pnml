@@ -8,7 +8,7 @@ switch (FEAT_ROADVEHS, PARENT, majestic_a2_articulated, extra_callback_info1) {
 item (FEAT_ROADVEHS, majestic_M_A2_BOX, 57041) {
     property {
         sprite_id: SPRITE_ID_NEW_ROADVEH;
-        misc_flags: bitmask(ROADVEH_FLAG_2CC);
+        misc_flags: bitmask(ROADVEH_FLAG_2CC, ROADVEH_FLAG_AUTOREFIT);
         road_type: ROAD;
         name: string(STR_NAME_MAJESTIC, string(STR_BLANK), string(STR_NAME_CONFIG_A2), string(STR_NAME_CARGO_BOX));
         climates_available: ALL_CLIMATES;
